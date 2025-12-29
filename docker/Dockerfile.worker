@@ -1,0 +1,62 @@
+# LDB-DataGuard Worker Dockerfile
+# BullMQ Worker with Playwright for web scraping
+
+FROM node:22-alpine AS base
+
+# Install dependencies for Playwright
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    tzdata
+
+# Set timezone
+ENV TZ=Europe/Berlin
+
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci --legacy-peer-deps
+
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Generate Prisma Client
+RUN npx prisma generate
+
+# Build TypeScript for worker
+RUN npx tsc --project tsconfig.worker.json || true
+
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV TZ=Europe/Berlin
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 worker
+
+# Copy node_modules and worker files
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/worker ./worker
+COPY --from=builder /app/src/lib ./src/lib
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/package.json ./package.json
+
+# Copy Prisma generated client
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+
+USER worker
+
+CMD ["npx", "tsx", "worker/index.ts"]

@@ -148,7 +148,8 @@ export async function addJob<T>(
     jobId?: string;
   }
 ): Promise<Job<T>> {
-  const job = await queue.add('process', data, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const job = await (queue as any).add('process', data, {
     priority: options?.priority,
     delay: options?.delay,
     jobId: options?.jobId,
@@ -156,7 +157,7 @@ export async function addJob<T>(
   
   logger.debug({ queue: queue.name, jobId: job.id }, 'Job added');
   
-  return job;
+  return job as Job<T>;
 }
 
 /**

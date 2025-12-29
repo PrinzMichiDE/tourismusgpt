@@ -1,36 +1,211 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LDB-DataGuard
+
+Enterprise platform for automated quality assurance of tourist POI (Points of Interest) data. Synchronizes TLDB master data, validates against web reality (Website Deep Crawl + Google Maps), uses AI for semantic comparison, and automatically notifies responsible parties via email.
+
+## Features
+
+- 🗄️ **POI Management**: Handle 50,000+ Points of Interest with virtualized tables
+- 🕷️ **Web Scraping**: Playwright-based deep crawling (depth 3) with robots.txt respect
+- 🗺️ **Google Maps Integration**: Place details fetching with cost tracking
+- 🤖 **AI-Powered Auditing**: OpenAI-compatible LLM for semantic data comparison
+- 📊 **Analytics Dashboard**: Nivo charts with trend analysis
+- 📧 **Email Notifications**: React Email templates with spam protection
+- 🔐 **Authentication**: NextAuth.js with Credentials and OAuth support
+- 🌍 **Internationalization**: German and English (next-intl)
+- 🎨 **Modern UI**: shadcn/ui + Tailwind CSS with dark mode
+- 📈 **Monitoring**: Prometheus metrics + Grafana dashboards
+
+## Tech Stack
+
+| Area | Technology |
+|------|------------|
+| Framework | Next.js 16 (App Router, Server Actions) |
+| Language | TypeScript (Strict Mode) |
+| UI | shadcn/ui + Tailwind CSS |
+| Tables | TanStack Table (Virtualized) |
+| Charts | Nivo |
+| Forms | React Hook Form + Zod |
+| Auth | NextAuth.js v5 |
+| i18n | next-intl |
+| Database | PostgreSQL 16 + Prisma ORM |
+| Queue | Redis + BullMQ |
+| Scraping | Playwright |
+| LLM | OpenAI-compatible API |
+| Email | Nodemailer + React Email |
+| Logging | Pino |
+| Monitoring | Prometheus + Grafana |
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 22+
+- PostgreSQL 16+
+- Redis 7+
+- Docker (optional, for containerized deployment)
+
+### Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Clone the repository
+git clone https://github.com/your-org/ldb-dataguard.git
+cd ldb-dataguard
+
+# Install dependencies
+npm install
+
+# Copy environment file
+cp .env.example .env.local
+
+# Edit .env.local with your configuration
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+See `.env.example` for all available configuration options. Required variables:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `DATABASE_URL`: PostgreSQL connection string
+- `REDIS_URL`: Redis connection string
+- `NEXTAUTH_SECRET`: Secret for NextAuth.js
+- `OPENAI_API_KEY`: API key for LLM integration
+- `GOOGLE_PLACES_API_KEY`: API key for Google Maps
 
-## Learn More
+### Database Setup
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Generate Prisma client
+npm run db:generate
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Run migrations
+npm run db:migrate
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Seed initial data
+npm run db:seed
+```
 
-## Deploy on Vercel
+### Development
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# Start development server
+npm run dev
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Run workers (in separate terminal)
+npm run worker
+```
+
+Open [http://localhost:3000](http://localhost:3000) to see the dashboard.
+
+### Default Login
+
+- Email: `admin@ldb-dataguard.de`
+- Password: `admin123`
+
+## Docker Deployment
+
+### Development
+
+```bash
+cd docker
+docker-compose up -d
+```
+
+### Production
+
+```bash
+cd docker
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+## Project Structure
+
+```
+├── src/
+│   ├── app/                 # Next.js App Router
+│   │   ├── [locale]/        # Localized routes (de, en)
+│   │   └── api/             # API routes
+│   ├── components/          # React components
+│   │   ├── ui/              # shadcn/ui components
+│   │   ├── layout/          # Layout components
+│   │   └── dashboard/       # Dashboard components
+│   ├── lib/                 # Business logic
+│   │   ├── auth.ts          # Authentication
+│   │   ├── db.ts            # Database client
+│   │   ├── openai.ts        # LLM integration
+│   │   ├── crawler.ts       # Web scraper
+│   │   ├── auditor.ts       # AI auditor
+│   │   └── queue.ts         # Job queues
+│   └── middleware.ts        # Security middleware
+├── worker/                  # BullMQ workers
+│   ├── handlers/            # Job handlers
+│   ├── auto-scaler.ts       # Dynamic scaling
+│   └── scheduler.ts         # Cron scheduler
+├── prisma/                  # Database schema
+├── messages/                # i18n translations
+├── docker/                  # Docker configuration
+└── tests/                   # Test suites
+```
+
+## API Documentation
+
+API documentation is available at `/api-docs` (Redoc) when running the application.
+
+### Key Endpoints
+
+- `GET /api/v1/pois` - List POIs with pagination
+- `POST /api/v1/pois` - Create new POI
+- `GET /api/v1/health` - Health check
+- `GET /api/metrics` - Prometheus metrics
+
+## Queue System
+
+Four queues handle background processing:
+
+1. **scraper-queue**: Website crawling (rate limited 1 req/sec)
+2. **maps-queue**: Google Places API calls
+3. **audit-queue**: AI-powered data comparison
+4. **mail-queue**: Email sending with spam protection
+
+## Monitoring
+
+### Prometheus Metrics
+
+Available at `/api/metrics`:
+
+- `ldb_pois_total`: Total POI count
+- `ldb_audit_score`: Average audit score
+- `ldb_queue_waiting`: Jobs waiting in queues
+- `ldb_api_cost_total`: API costs (OpenAI, Google Maps)
+
+### Grafana Dashboards
+
+Pre-configured dashboards in `docker/grafana/dashboards/`.
+
+## Testing
+
+```bash
+# Run unit tests
+npm run test
+
+# Run with coverage
+npm run test:coverage
+
+# Run E2E tests
+npm run test:e2e
+```
+
+## Security
+
+- OWASP Top 10 addressed
+- Rate limiting on all API endpoints
+- CSP and security headers
+- Input validation with Zod
+- SQL injection prevention via Prisma
+- bcrypt password hashing
+
+## License
+
+Proprietary - All rights reserved
+
+## Support
+
+For support, contact: support@ldb-dataguard.de

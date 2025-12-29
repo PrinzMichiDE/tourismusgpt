@@ -1,0 +1,135 @@
+# LDB-DataGuard Core Rules
+
+You are an expert full-stack developer working on LDB-DataGuard, an enterprise POI quality assurance platform for tourism data (50,000+ POIs).
+
+## Tech Stack Reference (Strict - No Alternatives)
+- Framework: Next.js 16 (App Router, Server Actions)
+- Language: TypeScript (Strict Mode)
+- Database: PostgreSQL 16 via Prisma ORM
+- UI: shadcn/ui, Tailwind CSS, TanStack Table (Virtual), Nivo Charts
+- Forms: React Hook Form + Zod
+- Auth: NextAuth.js v5 (Session-based)
+- Background Jobs: Redis 7 + BullMQ (Worker-Architecture)
+- Scheduling: node-cron (configurable via DB)
+- Scraper: Playwright (Deep Crawl depth 3)
+- AI: OpenAI-compatible API (Structured Outputs via Zod)
+- Email: Nodemailer + React Email
+- Documentation: Fumadocs (MDX) & Redoc (OpenAPI)
+- I18n: next-intl (DE/EN)
+- Toasts: Sonner
+- Icons: Lucide React
+- PDF: @react-pdf/renderer
+- Logging: Pino
+- Monitoring: Prometheus + Grafana
+
+## Architecture Principles
+1. Use Server Actions for data mutations (no custom API routes for simple CRUD).
+2. Use API Routes (`/api/v1/...`) only for external integrations or complex job triggers.
+3. Multi-layer Caching: Redis for shared data, ISR for POI pages, Browser for UI state.
+4. Separation of Concerns: Business logic in `lib/`, Worker logic in `worker/`, UI in `components/`.
+5. All database schemas must include `AuditLog` hooks for critical data changes.
+6. Timezone: Always use Europe/Berlin for all date/time operations.
+
+## Directory Map (Strict - Follow This Structure)
+```
+app/
+├── [locale]/           # next-intl locale routing
+│   ├── (auth)/         # Public auth pages (login, register)
+│   ├── dashboard/      # Protected dashboard routes
+│   ├── docs/           # Fumadocs documentation
+│   └── api-docs/       # Redoc API documentation
+├── api/v1/             # API Routes (versioned)
+components/
+├── ui/                 # shadcn/ui components ONLY (do not modify manually)
+├── layout/             # App shell components (nav, sidebar)
+├── dashboard/          # Dashboard-specific components
+├── poi/                # POI-related components
+└── common/             # Shared utility components
+lib/
+├── db.ts               # Prisma client singleton
+├── auth.ts             # NextAuth configuration
+├── openai.ts           # OpenAI client with retry logic
+├── queue.ts            # BullMQ queue definitions
+├── crawler.ts          # Playwright scraper
+├── auditor.ts          # AI comparison logic
+├── validators/         # Zod schemas
+└── utils/              # Pure utility functions
+worker/
+├── index.ts            # Worker entry point
+├── auto-scaler.ts      # Dynamic worker scaling
+└── handlers/           # Job handlers (scraper, audit, mail)
+prisma/
+├── schema.prisma       # Single Source of Truth for data model
+└── seed.ts             # Seed data (Schema.org fields)
+messages/
+├── de.json             # German translations
+└── en.json             # English translations
+```
+
+## Database & Prisma Rules
+1. Always add `createdAt DateTime @default(now())` and `updatedAt DateTime @updatedAt` to models.
+2. Create AuditLog entries for all critical data changes (POI, User, Config).
+3. Use soft deletes (`deletedAt DateTime?`) for recoverable data.
+4. Define explicit indexes for frequently queried fields.
+5. Use `@db.Text` for long strings, `@db.VarChar(255)` for short ones.
+
+## UI & Frontend Rules
+1. Use TanStack Table with virtualization (`@tanstack/react-virtual`) for all data tables - we handle 50k+ records.
+2. Use `sonner` for all toast notifications.
+3. Use `lucide-react` for all icons.
+4. Implement skeleton loading states for all async data.
+5. All forms must use React Hook Form + Zod validation.
+6. Support Light, Dark, and System themes via `next-themes`.
+
+## Internationalization Rules (next-intl)
+1. NEVER hardcode text in UI components.
+2. Always use `useTranslations` (client) or `getTranslations` (server).
+3. All translation keys must exist in both `messages/de.json` and `messages/en.json`.
+4. Date/time formatting must use `useFormatter` with Europe/Berlin timezone.
+
+## API Design Rules
+1. All API routes must be versioned: `/api/v1/...`
+2. Use Zod for request/response validation.
+3. Generate OpenAPI specs via `@asteasolutions/zod-to-openapi`.
+4. Implement rate limiting on all public endpoints.
+5. Return consistent error format: `{ error: string, code: string, details?: object }`
+
+## Security Rules (OWASP)
+1. Input validation with Zod on all user inputs.
+2. SQL injection prevention via Prisma (never raw SQL with user input).
+3. XSS prevention: sanitize all user-generated content.
+4. CSRF protection via NextAuth.
+5. Security headers: CSP, X-Frame-Options, X-Content-Type-Options.
+6. Rate limiting on auth endpoints (max 5 attempts/minute).
+7. Password hashing with bcryptjs (cost factor 12).
+
+## Worker & Queue Rules
+1. All long-running tasks go through BullMQ queues.
+2. Implement exponential backoff for retries (3 attempts max).
+3. Track job costs in CostTracking table.
+4. Failed jobs must be logged to FailedJob table for manual review.
+
+## Scraper Rules (Playwright)
+1. Respect robots.txt on all domains.
+2. Rate limit: 1 request per second per domain.
+3. Maximum crawl depth: 3 levels.
+4. Extract JSON-LD/Schema.org data first, fallback to HTML parsing.
+5. Store raw HTML for debugging (configurable retention).
+
+## AI/LLM Rules
+1. Use Zod schemas for structured outputs.
+2. Implement retry with exponential backoff.
+3. Track token usage and costs per request.
+4. Use temperature 0 for deterministic outputs.
+5. Prompts must be versioned and stored in `lib/prompts/`.
+
+## Git Commit Rules
+1. All commits must be in English.
+2. Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`.
+3. Keep commits atomic and focused.
+
+## Performance Targets
+- First Contentful Paint: < 1.5s
+- Time to Interactive: < 3.5s
+- Lighthouse Score: > 90
+- POI table rendering: < 100ms for 1000 visible rows

@@ -1,0 +1,685 @@
+// =============================================================================
+// LDB-DataGuard Prisma Schema
+// =============================================================================
+// PostgreSQL 16 Database Schema
+// All times are stored in UTC, displayed in Europe/Berlin
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// Authentication & Users
+// =============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?
+  role          UserRole  @default(VIEWER)
+  image         String?
+  locale        String    @default("de")
+  theme         String    @default("system")
+  
+  // 2FA (optional)
+  twoFactorEnabled Boolean   @default(false)
+  twoFactorSecret  String?
+  
+  // OAuth
+  emailVerified DateTime?
+  accounts      Account[]
+  sessions      Session[]
+  
+  // Relations
+  auditLogs       AuditLog[]
+  adminAuditLogs  AdminAuditLog[]
+  notifications   Notification[]
+  
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+  
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// =============================================================================
+// POI Data Model
+// =============================================================================
+
+model POI {
+  id          String    @id @default(cuid())
+  externalId  String?   @unique  // TLDB ID
+  name        String
+  category    String?
+  
+  // Location
+  street      String?
+  postalCode  String?
+  city        String?
+  region      String?
+  country     String?   @default("DE")
+  latitude    Float?
+  longitude   Float?
+  
+  // Contact
+  phone       String?
+  email       String?
+  website     String?
+  
+  // Audit Info
+  lastAuditAt    DateTime?
+  auditScore     Float?      @default(0)
+  auditStatus    AuditStatus @default(PENDING)
+  
+  // Source Data
+  tldbData       Json?
+  websiteData    Json?
+  mapsData       Json?
+  
+  // Metadata
+  priority       Int         @default(0)
+  isActive       Boolean     @default(true)
+  
+  // Relations
+  extractedValues ExtractedValue[]
+  contacts        Contact[]
+  audits          Audit[]
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  
+  @@index([category])
+  @@index([region])
+  @@index([auditScore])
+  @@index([auditStatus])
+  @@index([lastAuditAt])
+  @@map("pois")
+}
+
+enum AuditStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  REVIEW_REQUIRED
+}
+
+// =============================================================================
+// Data Fields (Schema.org based)
+// =============================================================================
+
+model DataField {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  displayName   Json     // { de: "Name", en: "Name" }
+  description   Json?    // { de: "...", en: "..." }
+  schemaOrgType String?  // Place, LocalBusiness, Restaurant
+  schemaOrgProp String?  // Schema.org property name
+  dataType      DataType @default(STRING)
+  isRequired    Boolean  @default(false)
+  isCore        Boolean  @default(true)
+  
+  // Extraction
+  extractionPrompt String? @db.Text
+  normalization    Json?   // Rules for data normalization
+  
+  // Display
+  displayOrder Int      @default(0)
+  category     String?
+  
+  // Relations
+  extractedValues ExtractedValue[]
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([schemaOrgType])
+  @@index([category])
+  @@map("data_fields")
+}
+
+enum DataType {
+  STRING
+  NUMBER
+  BOOLEAN
+  DATE
+  TIME
+  DATETIME
+  URL
+  EMAIL
+  PHONE
+  ADDRESS
+  COORDINATES
+  OPENING_HOURS
+  PRICE_RANGE
+  JSON
+}
+
+// =============================================================================
+// Extracted Values
+// =============================================================================
+
+model ExtractedValue {
+  id          String       @id @default(cuid())
+  poiId       String
+  fieldId     String
+  
+  // Values from different sources
+  tldbValue      String?   @db.Text
+  websiteValue   String?   @db.Text
+  mapsValue      String?   @db.Text
+  
+  // Normalized values
+  normalizedTldb    String? @db.Text
+  normalizedWebsite String? @db.Text
+  normalizedMaps    String? @db.Text
+  
+  // Comparison result
+  matchStatus  MatchStatus @default(PENDING)
+  confidence   Float?      // 0-1 confidence score
+  discrepancy  String?     @db.Text
+  
+  // AI analysis
+  aiAnalysis   Json?
+  
+  // Relations
+  poi   POI       @relation(fields: [poiId], references: [id], onDelete: Cascade)
+  field DataField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([poiId, fieldId])
+  @@index([matchStatus])
+  @@map("extracted_values")
+}
+
+enum MatchStatus {
+  PENDING
+  MATCH
+  PARTIAL_MATCH
+  MISMATCH
+  MISSING_DATA
+  REVIEW_REQUIRED
+}
+
+// =============================================================================
+// Contacts (from Impressum/Team pages)
+// =============================================================================
+
+model Contact {
+  id        String      @id @default(cuid())
+  poiId     String
+  
+  name      String?
+  email     String?
+  phone     String?
+  role      String?
+  
+  // Trust level based on source
+  trustLevel TrustLevel @default(MEDIUM)
+  source     String?    // URL where contact was found
+  
+  // Validation
+  emailValid   Boolean?
+  lastValidAt  DateTime?
+  
+  // Relations
+  poi POI @relation(fields: [poiId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([email])
+  @@index([trustLevel])
+  @@map("contacts")
+}
+
+enum TrustLevel {
+  HIGH      // From official Impressum
+  MEDIUM    // From contact page
+  LOW       // From other sources
+}
+
+// =============================================================================
+// Audits
+// =============================================================================
+
+model Audit {
+  id        String      @id @default(cuid())
+  poiId     String
+  
+  // Scores
+  overallScore   Float     // 0-100
+  fieldScores    Json?     // Per-field scores
+  
+  // Details
+  summary        String?   @db.Text
+  discrepancies  Json?     // List of found discrepancies
+  recommendations Json?    // Suggested fixes
+  
+  // Processing info
+  processedAt    DateTime?
+  processingTime Int?      // in milliseconds
+  
+  // LLM info
+  llmModel       String?
+  llmTokensUsed  Int?
+  llmCost        Float?
+  
+  // Status
+  status         AuditStatus @default(PENDING)
+  errorMessage   String?     @db.Text
+  
+  // Relations
+  poi POI @relation(fields: [poiId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([status])
+  @@index([overallScore])
+  @@index([createdAt])
+  @@map("audits")
+}
+
+// =============================================================================
+// Audit Log (Data Changes)
+// =============================================================================
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  userId      String?
+  
+  action      String    // CREATE, UPDATE, DELETE
+  resource    String    // Table/Model name
+  resourceId  String
+  
+  oldValue    Json?
+  newValue    Json?
+  changes     Json?     // Diff between old and new
+  
+  ipAddress   String?
+  userAgent   String?
+  
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  @@index([resource, resourceId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// =============================================================================
+// Admin Audit Log (Admin Actions)
+// =============================================================================
+
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  
+  action      String   // User action description
+  details     Json?    // Additional details
+  
+  ipAddress   String?
+  userAgent   String?
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
+}
+
+// =============================================================================
+// Notifications
+// =============================================================================
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  
+  type        NotificationType
+  title       String
+  message     String   @db.Text
+  data        Json?
+  
+  read        Boolean  @default(false)
+  readAt      DateTime?
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  @@index([userId, read])
+  @@index([type])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  AUDIT_COMPLETE
+  DISCREPANCY_FOUND
+  SYSTEM_ALERT
+  REPORT_READY
+  JOB_FAILED
+}
+
+// =============================================================================
+// System Notifications (Dashboard)
+// =============================================================================
+
+model SystemNotification {
+  id          String   @id @default(cuid())
+  
+  type        String   // info, warning, error, success
+  title       String
+  message     String   @db.Text
+  
+  isActive    Boolean  @default(true)
+  expiresAt   DateTime?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("system_notifications")
+}
+
+// =============================================================================
+// Schedule Configuration
+// =============================================================================
+
+model ScheduleConfig {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  
+  cronExpression String   // Cron expression
+  isActive       Boolean  @default(true)
+  
+  // Filter criteria
+  filters     Json?    // { region: "SH", category: "Restaurant" }
+  
+  // Execution info
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  lastStatus  String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("schedule_configs")
+}
+
+// =============================================================================
+// Cost Tracking
+// =============================================================================
+
+model CostTracking {
+  id          String   @id @default(cuid())
+  
+  service     String   // openai, google_maps, smtp
+  operation   String   // chat_completion, place_details, send_email
+  
+  poiId       String?
+  
+  // Cost details
+  units       Int      // tokens, requests, etc.
+  unitCost    Float    // cost per unit
+  totalCost   Float    // total cost
+  
+  // Metadata
+  metadata    Json?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  @@index([service])
+  @@index([createdAt])
+  @@index([poiId])
+  @@map("cost_tracking")
+}
+
+// =============================================================================
+// Retention Configuration
+// =============================================================================
+
+model RetentionConfig {
+  id          String   @id @default(cuid())
+  
+  resource    String   @unique // Table/data type name
+  days        Int      // Retention in days
+  action      String   @default("delete") // delete, archive
+  
+  lastCleanup DateTime?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("retention_configs")
+}
+
+// =============================================================================
+// Failed Jobs
+// =============================================================================
+
+model FailedJob {
+  id          String   @id @default(cuid())
+  
+  queue       String
+  jobId       String
+  jobData     Json
+  
+  error       String   @db.Text
+  stackTrace  String?  @db.Text
+  
+  attempts    Int      @default(1)
+  maxAttempts Int      @default(3)
+  
+  // Review
+  reviewed    Boolean  @default(false)
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  resolution  String?  @db.Text
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([queue])
+  @@index([reviewed])
+  @@index([createdAt])
+  @@map("failed_jobs")
+}
+
+// =============================================================================
+// Feature Flags
+// =============================================================================
+
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  
+  key         String   @unique
+  name        String
+  description String?
+  
+  isEnabled   Boolean  @default(false)
+  
+  // Targeting
+  enabledForRoles Json?  // ["ADMIN", "EDITOR"]
+  enabledForUsers Json?  // ["user-id-1", "user-id-2"]
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("feature_flags")
+}
+
+// =============================================================================
+// App Configuration
+// =============================================================================
+
+model AppConfig {
+  id          String   @id @default(cuid())
+  
+  key         String   @unique
+  value       Json
+  
+  description String?
+  category    String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([category])
+  @@map("app_configs")
+}
+
+// =============================================================================
+// Mail Queue (Outbox)
+// =============================================================================
+
+model MailOutbox {
+  id          String   @id @default(cuid())
+  
+  to          String
+  subject     String
+  template    String
+  data        Json
+  locale      String   @default("de")
+  
+  // Status
+  status      MailStatus @default(PENDING)
+  sentAt      DateTime?
+  error       String?
+  attempts    Int        @default(0)
+  
+  // Content hash for deduplication
+  contentHash String?
+  
+  // Spam protection
+  lastMailAt  DateTime?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([status])
+  @@index([to, contentHash])
+  @@index([createdAt])
+  @@map("mail_outbox")
+}
+
+enum MailStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  BLOCKED
+}
+
+// =============================================================================
+// Scraped Content (Raw HTML storage)
+// =============================================================================
+
+model ScrapedContent {
+  id          String   @id @default(cuid())
+  
+  poiId       String?
+  url         String
+  
+  // Content
+  html        String?  @db.Text
+  jsonLd      Json?    // Extracted JSON-LD data
+  
+  // Metadata
+  statusCode  Int?
+  contentType String?
+  
+  // Crawl info
+  depth       Int      @default(0)
+  parentUrl   String?
+  
+  // Timestamps
+  scrapedAt DateTime @default(now())
+  
+  @@index([poiId])
+  @@index([url])
+  @@index([scrapedAt])
+  @@map("scraped_content")
+}

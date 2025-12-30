@@ -1,0 +1,80 @@
+{
+  "node": {
+    "4032b2cacab50ec35070014dd6204b0f9b9cd3caab": {
+      "workers": {
+        "app/tasks/page": {
+          "moduleId": 26099,
+          "async": false,
+          "exportedName": "createTask",
+          "filename": "src/app/tasks/actions.ts"
+        }
+      },
+      "layer": {
+        "app/tasks/page": "rsc"
+      },
+      "exportedName": "createTask",
+      "filename": "src/app/tasks/actions.ts"
+    },
+    "003640fc4051b5a393b4962b3297eae823442af274": {
+      "workers": {
+        "app/tasks/page": {
+          "moduleId": 26099,
+          "async": false,
+          "exportedName": "getTasks",
+          "filename": "src/app/tasks/actions.ts"
+        }
+      },
+      "layer": {
+        "app/tasks/page": "rsc"
+      },
+      "exportedName": "getTasks",
+      "filename": "src/app/tasks/actions.ts"
+    },
+    "407027e457a58ea77150faa8e0259df476da204312": {
+      "workers": {
+        "app/tasks/page": {
+          "moduleId": 26099,
+          "async": false,
+          "exportedName": "deleteTask",
+          "filename": "src/app/tasks/actions.ts"
+        }
+      },
+      "layer": {
+        "app/tasks/page": "action-browser"
+      },
+      "exportedName": "deleteTask",
+      "filename": "src/app/tasks/actions.ts"
+    },
+    "607194b437fec326e3ffbcdc6d35575fe33680b1ae": {
+      "workers": {
+        "app/tasks/page": {
+          "moduleId": 26099,
+          "async": false,
+          "exportedName": "updateTask",
+          "filename": "src/app/tasks/actions.ts"
+        }
+      },
+      "layer": {
+        "app/tasks/page": "rsc"
+      },
+      "exportedName": "updateTask",
+      "filename": "src/app/tasks/actions.ts"
+    },
+    "60deb625d409443ad2f5a6e894616284354fe4e3b3": {
+      "workers": {
+        "app/tasks/page": {
+          "moduleId": 26099,
+          "async": false,
+          "exportedName": "toggleTask",
+          "filename": "src/app/tasks/actions.ts"
+        }
+      },
+      "layer": {
+        "app/tasks/page": "action-browser"
+      },
+      "exportedName": "toggleTask",
+      "filename": "src/app/tasks/actions.ts"
+    }
+  },
+  "edge": {}
+}

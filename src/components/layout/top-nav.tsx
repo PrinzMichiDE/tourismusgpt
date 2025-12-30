@@ -2,22 +2,18 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Search,
-  Bell,
-  Moon,
-  Sun,
   Globe,
   Menu,
-  LogOut,
-  Settings,
-  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { cn } from '@/lib/utils';
+import { NotificationCenter } from './notification-center';
+import { ThemeToggle } from '@/components/common/theme-toggle';
+import { KeyboardShortcuts } from '@/components/common/keyboard-shortcuts';
 
 interface TopNavProps {
   user?: {
@@ -31,14 +27,8 @@ interface TopNavProps {
 
 export function TopNav({ user, locale = 'de', onMenuClick }: TopNavProps) {
   const pathname = usePathname();
-  const [theme, setTheme] = React.useState<'light' | 'dark' | 'system'>('system');
-  const [showSearch, setShowSearch] = React.useState(false);
-
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
-  };
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = React.useState('');
 
   const userInitials = user?.name
     ? user.name
@@ -47,6 +37,19 @@ export function TopNav({ user, locale = 'de', onMenuClick }: TopNavProps) {
         .join('')
         .toUpperCase()
     : 'U';
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/${locale}/dashboard?search=${encodeURIComponent(searchQuery)}`);
+    }
+  };
+
+  const switchLocale = () => {
+    const newLocale = locale === 'de' ? 'en' : 'de';
+    const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
+    router.push(newPath);
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -62,7 +65,7 @@ export function TopNav({ user, locale = 'de', onMenuClick }: TopNavProps) {
         </Button>
 
         {/* Logo */}
-        <Link href="/dashboard" className="flex items-center gap-2 font-bold">
+        <Link href={`/${locale}/dashboard`} className="flex items-center gap-2 font-bold">
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground text-sm">
             LDB
           </div>
@@ -70,46 +73,41 @@ export function TopNav({ user, locale = 'de', onMenuClick }: TopNavProps) {
         </Link>
 
         {/* Search */}
-        <div className="flex-1 max-w-md">
+        <form onSubmit={handleSearch} className="flex-1 max-w-md">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder={locale === 'de' ? 'POIs suchen...' : 'Search POIs...'}
               className="pl-8 w-full"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              data-search-input
             />
           </div>
-        </div>
+        </form>
 
         {/* Right Side */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          {/* Keyboard Shortcuts */}
+          <KeyboardShortcuts locale={locale} />
+
           {/* Language Switcher */}
-          <Button variant="ghost" size="icon" asChild>
-            <Link href={pathname} locale={locale === 'de' ? 'en' : 'de'}>
-              <Globe className="h-4 w-4" />
-              <span className="sr-only">
-                {locale === 'de' ? 'Switch to English' : 'Auf Deutsch wechseln'}
-              </span>
-            </Link>
-          </Button>
-
-          {/* Theme Toggle */}
-          <Button variant="ghost" size="icon" onClick={toggleTheme}>
-            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Toggle theme</span>
-          </Button>
-
-          {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-4 w-4" />
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground flex items-center justify-center">
-              3
+          <Button variant="ghost" size="icon" onClick={switchLocale}>
+            <Globe className="h-5 w-5" />
+            <span className="sr-only">
+              {locale === 'de' ? 'Switch to English' : 'Auf Deutsch wechseln'}
             </span>
           </Button>
 
+          {/* Theme Toggle */}
+          <ThemeToggle />
+
+          {/* Notifications */}
+          <NotificationCenter locale={locale} />
+
           {/* User Menu */}
-          <div className="flex items-center gap-2 pl-2 border-l">
+          <div className="flex items-center gap-2 pl-2 border-l ml-2">
             <Avatar className="h-8 w-8">
               <AvatarImage src={user?.image || ''} alt={user?.name || 'User'} />
               <AvatarFallback>{userInitials}</AvatarFallback>

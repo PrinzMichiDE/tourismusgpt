@@ -1,12 +1,9 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { Toaster } from 'sonner';
 import '../globals.css';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'LDB-DataGuard',
@@ -36,7 +33,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className="font-sans antialiased">
         <NextIntlClientProvider messages={messages}>
           {children}
           <Toaster 

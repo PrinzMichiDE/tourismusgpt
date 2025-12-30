@@ -1,0 +1,127 @@
+---
+title: Setup Guide
+description: Schritt-für-Schritt Anleitung zur Installation
+---
+
+# Setup Guide
+
+## Lokale Entwicklung
+
+### 1. Voraussetzungen installieren
+
+```bash
+# Node.js 22+ (via nvm)
+nvm install 22
+nvm use 22
+
+# PostgreSQL 16
+# macOS: brew install postgresql@16
+# Ubuntu: sudo apt install postgresql-16
+
+# Redis 7
+# macOS: brew install redis
+# Ubuntu: sudo apt install redis-server
+```
+
+### 2. Repository klonen
+
+```bash
+git clone https://github.com/your-org/ldb-dataguard.git
+cd ldb-dataguard
+```
+
+### 3. Abhängigkeiten installieren
+
+```bash
+npm install
+```
+
+### 4. Umgebungsvariablen
+
+```bash
+cp .env.example .env.local
+```
+
+Wichtige Variablen:
+
+| Variable | Beschreibung |
+|----------|--------------|
+| `DATABASE_URL` | PostgreSQL Connection String |
+| `REDIS_URL` | Redis Connection String |
+| `NEXTAUTH_SECRET` | Session-Verschlüsselung |
+| `OPENAI_API_KEY` | API Key für LLM |
+| `GOOGLE_PLACES_API_KEY` | Google Maps API Key |
+
+### 5. Datenbank einrichten
+
+```bash
+# Prisma Client generieren
+npm run db:generate
+
+# Migrationen ausführen
+npm run db:migrate
+
+# Seed-Daten laden
+npm run db:seed
+```
+
+### 6. Entwicklung starten
+
+```bash
+# Next.js Dev Server
+npm run dev
+
+# Worker (separates Terminal)
+npm run worker
+```
+
+## Docker Deployment
+
+### Development
+
+```bash
+cd docker
+docker-compose up -d
+```
+
+### Production
+
+```bash
+cd docker
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+## Erste Schritte
+
+1. Öffnen Sie http://localhost:3000
+2. Login mit: `admin@ldb-dataguard.de` / `admin123`
+3. Importieren Sie POI-Daten über das Dashboard
+4. Starten Sie den ersten Audit
+
+## Troubleshooting
+
+### Datenbankverbindung fehlgeschlagen
+
+```bash
+# PostgreSQL Status prüfen
+pg_isready
+
+# Connection String testen
+psql $DATABASE_URL
+```
+
+### Redis nicht erreichbar
+
+```bash
+# Redis Status prüfen
+redis-cli ping
+```
+
+### Build-Fehler
+
+```bash
+# Cache leeren
+rm -rf .next node_modules
+npm install
+npm run build
+```

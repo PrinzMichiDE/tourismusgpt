@@ -1,0 +1,66 @@
+---
+title: LDB-DataGuard Dokumentation
+description: Enterprise-Plattform zur automatisierten Qualitätssicherung touristischer POI-Daten
+---
+
+# LDB-DataGuard
+
+Willkommen zur LDB-DataGuard Dokumentation. Diese Plattform ermöglicht die automatisierte Qualitätssicherung von touristischen POI-Daten (Points of Interest).
+
+## Funktionen
+
+- **POI-Management**: Verwaltung von über 50.000 POIs
+- **Web-Scraping**: Automatisierte Datenextraktion von Websites
+- **Google Maps Integration**: Abgleich mit Google Places Daten
+- **KI-Audit**: Semantischer Vergleich mittels LLM
+- **E-Mail-Benachrichtigungen**: Automatische Alerts bei Abweichungen
+
+## Schnellstart
+
+### Voraussetzungen
+
+- Node.js 22+
+- PostgreSQL 16+
+- Redis 7+
+
+### Installation
+
+```bash
+# Repository klonen
+git clone https://github.com/your-org/ldb-dataguard.git
+cd ldb-dataguard
+
+# Abhängigkeiten installieren
+npm install
+
+# Umgebungsvariablen konfigurieren
+cp .env.example .env.local
+
+# Datenbank initialisieren
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+
+# Entwicklungsserver starten
+npm run dev
+```
+
+## Architektur
+
+```
+┌─────────────────────────────────────────────────┐
+│                  Next.js App                     │
+├─────────────────────────────────────────────────┤
+│  Dashboard  │  API Routes  │  Server Actions    │
+├─────────────────────────────────────────────────┤
+│                  Prisma ORM                      │
+├─────────────────────────────────────────────────┤
+│  PostgreSQL │    Redis     │   BullMQ Workers   │
+└─────────────────────────────────────────────────┘
+```
+
+## Nächste Schritte
+
+- [Setup Guide](/docs/setup) - Detaillierte Installationsanleitung
+- [Architektur](/docs/architecture) - Technische Übersicht
+- [API Referenz](/api-docs) - OpenAPI Dokumentation

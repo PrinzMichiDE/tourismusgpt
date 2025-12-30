@@ -1,0 +1,110 @@
+---
+title: Architektur
+description: Technische Übersicht der Systemarchitektur
+---
+
+# Architektur
+
+## Systemübersicht
+
+LDB-DataGuard besteht aus mehreren Komponenten:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Client (Browser)                      │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+┌─────────────────────────────▼───────────────────────────────┐
+│                     Next.js Application                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │  Dashboard  │  │ API Routes  │  │   Server Actions    │  │
+│  │    (React)  │  │  (REST API) │  │  (Data Mutations)   │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+┌─────────────────────────────▼───────────────────────────────┐
+│                       Prisma ORM                             │
+└───────────┬─────────────────────────────────┬───────────────┘
+            │                                 │
+┌───────────▼───────────┐       ┌─────────────▼─────────────┐
+│     PostgreSQL 16     │       │         Redis 7           │
+│   (Primary Database)  │       │  (Cache + Job Queues)     │
+└───────────────────────┘       └─────────────┬─────────────┘
+                                              │
+                                ┌─────────────▼─────────────┐
+                                │      BullMQ Workers       │
+                                │  ┌───────┐ ┌───────────┐  │
+                                │  │Scraper│ │  Auditor  │  │
+                                │  └───────┘ └───────────┘  │
+                                │  ┌───────┐ ┌───────────┐  │
+                                │  │ Maps  │ │   Mail    │  │
+                                │  └───────┘ └───────────┘  │
+                                └───────────────────────────┘
+```
+
+## Datenfluss
+
+### POI Audit Workflow
+
+1. **Trigger**: Manuell oder per Cron-Schedule
+2. **Scraper Queue**: Website wird gecrawlt (Tiefe 3)
+3. **Maps Queue**: Google Places Daten werden abgerufen
+4. **Audit Queue**: KI vergleicht TLDB, Website und Maps Daten
+5. **Mail Queue**: Bei Abweichungen wird Benachrichtigung gesendet
+
+```
+POI → Scraper → Maps → Auditor → [Score < 80?] → Notifier
+                                       ↓
+                              Update POI Status
+```
+
+## Komponenten
+
+### Next.js App (Port 3000)
+
+- **App Router**: Dateibasiertes Routing
+- **Server Components**: SSR für optimale Performance
+- **Server Actions**: Typsichere Datenmutationen
+- **API Routes**: REST API für externe Integrationen
+
+### Worker Prozess
+
+- **Auto-Scaler**: Dynamische Worker-Anzahl
+- **Scheduler**: Cron-basierte Job-Planung
+- **Handlers**: Spezialisierte Job-Verarbeitung
+
+### Datenbank Schema
+
+Hauptmodelle:
+
+| Model | Beschreibung |
+|-------|--------------|
+| User | Benutzerkonten und Rollen |
+| POI | Points of Interest |
+| DataField | Schema.org Feldkonfiguration |
+| ExtractedValue | Extrahierte Werte je Quelle |
+| Audit | Audit-Ergebnisse |
+| Contact | Gefundene Kontakte |
+
+### Queue System
+
+| Queue | Funktion | Rate Limit |
+|-------|----------|------------|
+| scraper-queue | Website Crawling | 1 req/sec |
+| maps-queue | Google Places API | - |
+| audit-queue | KI-Vergleich | - |
+| mail-queue | E-Mail Versand | - |
+
+## Security
+
+- **Rate Limiting**: Schutz vor Überlastung
+- **CSP Headers**: XSS-Prävention
+- **Input Validation**: Zod Schemas
+- **SQL Injection**: Prisma ORM
+- **Password Hashing**: bcrypt (cost 12)
+
+## Monitoring
+
+- **Prometheus**: Metriken-Sammlung
+- **Grafana**: Dashboards
+- **Pino**: Strukturiertes Logging
